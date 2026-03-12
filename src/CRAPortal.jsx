@@ -829,13 +829,23 @@ function ManagerDashboard({ onBack }) {
       });
       if (!res.ok) throw new Error("Dashboard unavailable");
       const raw = await res.json();
-      // n8n may return an array directly, or { records: [...] }
-      const json = Array.isArray(raw) ? raw : raw;
-      setData(Array.isArray(json) ? json : (json.records || []));
-      setLastRefresh(new Date());
-    } catch (e) {
-      // For demo: use mock data when webhook isn't configured
-      setData(MOCK_RECORDS);
+      const rows = Array.isArray(raw) ? raw : (raw.records || []);
+      const mapped = rows
+        .filter(r => r.staff_name && r.staff_name.trim() !== "")
+        .map(r => ({
+          staff_name:        r.staff_name || "—",
+          role:              r.role || "—",
+          hire_date:         r.hire_date || "—",
+          two_week_deadline: r.two_week_deadline || "—",
+          session_status:    r.session_status || "",
+          system_access:     r.system_access || "None",
+          third_party:       r.third_party || "no",
+          returning_staff:   r.returning_staff || "no",
+          completions_log:   r.completions_log || "",
+          last_updated:      r.last_updated || "",
+          session_id:        r.session_id || "",
+        }));
+      setData(mapped);
       setLastRefresh(new Date());
     }
     setLoading(false);
