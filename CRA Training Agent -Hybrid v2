@@ -1,0 +1,1727 @@
+{
+  "name": "CRA Training Agent — Hybrid v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cra-intake",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "f7b9306f-d2b5-47b4-a57c-1771a4985c94",
+      "name": "Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        112,
+        496
+      ],
+      "webhookId": "cra-intake",
+      "notes": "Receives structured form POST from frontend. All intake fields arrive at once — no LLM needed for data collection."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.third_party }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "03744791-5e95-42c3-b6bd-914e70fccb7b"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2ebe1e7d-fe9d-4c4e-a049-fe75cb9c1ed9",
+      "name": "Gate 1: Third Party?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        608,
+        480
+      ],
+      "notes": "DETERMINISTIC GATE 1 — Hard rule: third-party employees are governed by SOP 21, not SOP 15. True branch = SOP 21 route. False branch = continue SOP 15."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  routed: true,\n  sop: 'SOP 21',\n  message: 'As an external or third-party employee, your onboarding is governed by SOP 21 — Onboarding and Training of Third Party Employees, not SOP 15. Please contact the Office of Clinical Research for your onboarding instructions.'\n}) }}",
+        "options": {}
+      },
+      "id": "8083dafe-0285-4c21-81d4-41a3404ffbf9",
+      "name": "Respond: Route to SOP 21",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        816,
+        336
+      ],
+      "notes": "No LLM call made. Deterministic response. Session ends here for third-party staff."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.returning_staff }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "c894c497-e658-4924-9456-f552645f78ea"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5b736319-d736-4a76-a9cf-2e5784ff2b03",
+      "name": "Gate 2: Returning Staff?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        816,
+        560
+      ],
+      "notes": "DETERMINISTIC GATE 2 — Returning staff skip full onboarding bundle. True branch = gaps-only flag. False branch = full new-hire onboarding."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s-name",
+              "name": "staff_name",
+              "value": "={{ $json.body.staff_name.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "s-role",
+              "name": "role",
+              "value": "={{ $json.body.role.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "s-hire",
+              "name": "hire_date",
+              "value": "={{ $json.body.hire_date }}",
+              "type": "string"
+            },
+            {
+              "id": "s-ret",
+              "name": "returning_staff",
+              "value": "yes",
+              "type": "string"
+            },
+            {
+              "id": "s-citi",
+              "name": "prior_citi",
+              "value": "={{ $json.body.prior_citi || 'none' }}",
+              "type": "string"
+            },
+            {
+              "id": "s-citid",
+              "name": "prior_citi_details",
+              "value": "={{ $json.body.prior_citi_details || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "s-sys",
+              "name": "system_access",
+              "value": "={{ Array.isArray($json.body.system_access) ? $json.body.system_access.join(', ') : ($json.body.system_access || 'none') }}",
+              "type": "string"
+            },
+            {
+              "id": "s-act",
+              "name": "activities",
+              "value": "={{ Array.isArray($json.body.activities) ? $json.body.activities.join(', ') : ($json.body.activities || 'none') }}",
+              "type": "string"
+            },
+            {
+              "id": "s-spec",
+              "name": "specimen_handling",
+              "value": "={{ $json.body.specimen_handling || 'neither' }}",
+              "type": "string"
+            },
+            {
+              "id": "s-nih",
+              "name": "nih_funded",
+              "value": "={{ $json.body.nih_funded || 'no' }}",
+              "type": "string"
+            },
+            {
+              "id": "s-onboard",
+              "name": "onboarding_type",
+              "value": "returning — gaps only",
+              "type": "string"
+            },
+            {
+              "id": "s-deadline",
+              "name": "two_week_deadline",
+              "value": "={{ DateTime.fromISO($json.body.hire_date).plus({ days: 14 }).toFormat('MM/dd/yyyy') }}",
+              "type": "string"
+            },
+            {
+              "id": "s-sid",
+              "name": "session_id",
+              "value": "={{ $('Intake Webhook').item.json.body.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "s-status",
+              "name": "session_status",
+              "value": "Intake Received",
+              "type": "string"
+            },
+            {
+              "id": "s-ts",
+              "name": "created_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1789f6ba-4d85-472a-b214-a7b49a22a406",
+      "name": "Set Fields (Returning)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        464
+      ],
+      "notes": "Returning staff path. onboarding_type flag tells Claude to check gaps only, not assign full new-hire bundle."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n-name",
+              "name": "staff_name",
+              "value": "={{ $('Intake Webhook').item.json.body.staff_name }}",
+              "type": "string"
+            },
+            {
+              "id": "n-role",
+              "name": "role",
+              "value": "={{ $('Intake Webhook').item.json.body.role }}",
+              "type": "string"
+            },
+            {
+              "id": "n-hire",
+              "name": "hire_date",
+              "value": "={{ $('Intake Webhook').item.json.body.hire_date }}",
+              "type": "string"
+            },
+            {
+              "id": "n-ret",
+              "name": "returning_staff",
+              "value": "={{ $('Intake Webhook').item.json.body.returning_staff }}",
+              "type": "string"
+            },
+            {
+              "id": "n-citi",
+              "name": "prior_citi",
+              "value": "={{ $('Intake Webhook').item.json.body.prior_citi }}",
+              "type": "string"
+            },
+            {
+              "id": "n-citid",
+              "name": "prior_citi_details",
+              "value": "={{ $('Intake Webhook').item.json.body.prior_citi_details }}",
+              "type": "string"
+            },
+            {
+              "id": "n-sys",
+              "name": "system_access",
+              "value": "={{ $('Intake Webhook').item.json.body.system_access }}",
+              "type": "string"
+            },
+            {
+              "id": "n-act",
+              "name": "activities",
+              "value": "={{ $('Intake Webhook').item.json.body.activities }}",
+              "type": "string"
+            },
+            {
+              "id": "n-spec",
+              "name": "specimen_handling",
+              "value": "={{ $('Intake Webhook').item.json.body.specimen_handling }}",
+              "type": "string"
+            },
+            {
+              "id": "n-nih",
+              "name": "nih_funded",
+              "value": "={{ $('Intake Webhook').item.json.body.nih_funded }}",
+              "type": "string"
+            },
+            {
+              "id": "n-onboard",
+              "name": "onboarding_type",
+              "value": "new hire — full onboarding",
+              "type": "string"
+            },
+            {
+              "id": "n-deadline",
+              "name": "two_week_deadline",
+              "value": "={{ DateTime.fromISO($('Intake Webhook').item.json.body.hire_date).plus({ days: 14 }).toFormat('MM/dd/yyyy') }}",
+              "type": "string"
+            },
+            {
+              "id": "n-sid",
+              "name": "session_id",
+              "value": "={{ $('Intake Webhook').item.json.body.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "n-status",
+              "name": "session_status",
+              "value": "Intake Received",
+              "type": "string"
+            },
+            {
+              "id": "n-ts",
+              "name": "created_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "05c79952-02ce-49aa-9810-1052db871e1a",
+      "name": "Set Fields (New Hire)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        656
+      ],
+      "notes": "New hire path. Full onboarding bundle applies. two_week_deadline calculated from hire_date, not $now."
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1xPiAbaQ_bq4ONTulobQTR3Jdz45DVWQpcxhGX3q42JE/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Training Tracker",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $json.session_id }}",
+            "staff_name": "={{ $json.staff_name }}",
+            "role": "={{ $json.role }}",
+            "hire_date": "={{ $json.hire_date }}",
+            "two_week_deadline": "={{ $json.two_week_deadline }}",
+            "third_party": "no",
+            "returning_staff": "={{ $json.returning_staff }}",
+            "onboarding_type": "={{ $json.onboarding_type }}",
+            "prior_citi": "={{ $json.prior_citi }}",
+            "prior_citi_details": "={{ $json.prior_citi_details }}",
+            "system_access": "={{ $json.system_access }}",
+            "activities": "={{ $json.activities }}",
+            "specimen_handling": "={{ $json.specimen_handling }}",
+            "nih_funded": "={{ $json.nih_funded }}",
+            "session_status": "={{ $json.session_status }}",
+            "training_plan": "",
+            "completions_log": "",
+            "created_at": "={{ $json.created_at }}",
+            "last_updated": "={{ $json.created_at }}"
+          },
+          "matchingColumns": [
+            "session_id"
+          ],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": true,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "staff_name",
+              "displayName": "staff_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "hire_date",
+              "displayName": "hire_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "two_week_deadline",
+              "displayName": "two_week_deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "third_party",
+              "displayName": "third_party",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "returning_staff",
+              "displayName": "returning_staff",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "onboarding_type",
+              "displayName": "onboarding_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "prior_citi",
+              "displayName": "prior_citi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "prior_citi_details",
+              "displayName": "prior_citi_details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "system_access",
+              "displayName": "system_access",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "activities",
+              "displayName": "activities",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "specimen_handling",
+              "displayName": "specimen_handling",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "nih_funded",
+              "displayName": "nih_funded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "session_status",
+              "displayName": "session_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "training_plan",
+              "displayName": "training_plan",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "completions_log",
+              "displayName": "completions_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "last_updated",
+              "displayName": "last_updated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9354c4a3-28dc-4092-b204-4109411bfee1",
+      "name": "Save Intake to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1280,
+        560
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "bCUleVpjRHY7rOva",
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "notes": "Merges both returning and new-hire paths. Writes intake row immediately before any LLM call. session_id is the match key."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "profile-str",
+              "name": "staff_profile",
+              "value": "=VERIFIED STAFF PROFILE — collected via structured intake form. Do not ask for any of this information again.\n\nName: {{ $json.staff_name }}\nRole: {{ $json.role }}\nHire Date: {{ $json.hire_date }}\n2-Week Training Deadline: {{ $json.two_week_deadline }}\nEmployment Type: GWU/MFA Direct Employee (SOP 15 applies)\nOnboarding Type: {{ $json.onboarding_type }}\nPrior CITI Training: {{ $json.prior_citi }}{{ $json.prior_citi_details ? ' — Details: ' + $json.prior_citi_details : '' }}\nSystem Access Needed: {{ $json.system_access }}\nResearch Activities: {{ $json.activities }}\nSpecimen Handling: {{ $json.specimen_handling }}\nNIH-Funded Studies: {{ $json.nih_funded }}\n\nTask: Apply SOP 15 v4.0 rules to this profile and generate the complete personalized training plan now.",
+              "type": "string"
+            },
+            {
+              "id": "pass-sid",
+              "name": "session_id",
+              "value": "={{ $json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "pass-name",
+              "name": "staff_name",
+              "value": "={{ $json.staff_name }}",
+              "type": "string"
+            },
+            {
+              "id": "pass-dl",
+              "name": "two_week_deadline",
+              "value": "={{ $json.two_week_deadline }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "563ab4b6-5800-413e-abfc-e6c75ec13e84",
+      "name": "Build Profile String",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1504,
+        560
+      ],
+      "notes": "Assembles all intake fields into a single structured prompt string. Passes session_id and key fields through for downstream nodes."
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1xPiAbaQ_bq4ONTulobQTR3Jdz45DVWQpcxhGX3q42JE/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Training Tracker",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $('Build Profile String').item.json.session_id }}",
+            "training_plan": "={{ $json.output }}",
+            "session_status": "Plan Generated",
+            "last_updated": "={{ $now.toISO() }}",
+            "staff_name": "={{ $('Build Profile String').item.json.staff_name }}",
+            "role": "={{ $('Save Intake to Sheets').item.json.role }}",
+            "hire_date": "={{ $('Save Intake to Sheets').item.json.hire_date }}",
+            "two_week_deadline": "={{ $('Build Profile String').item.json.two_week_deadline }}"
+          },
+          "matchingColumns": [
+            "session_id"
+          ],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "staff_name",
+              "displayName": "staff_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "hire_date",
+              "displayName": "hire_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "two_week_deadline",
+              "displayName": "two_week_deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "third_party",
+              "displayName": "third_party",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "returning_staff",
+              "displayName": "returning_staff",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "onboarding_type",
+              "displayName": "onboarding_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "prior_citi",
+              "displayName": "prior_citi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "prior_citi_details",
+              "displayName": "prior_citi_details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "system_access",
+              "displayName": "system_access",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "activities",
+              "displayName": "activities",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "specimen_handling",
+              "displayName": "specimen_handling",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nih_funded",
+              "displayName": "nih_funded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "session_status",
+              "displayName": "session_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "training_plan",
+              "displayName": "training_plan",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "completions_log",
+              "displayName": "completions_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "last_updated",
+              "displayName": "last_updated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "eb0386e1-d48e-47db-8030-fc5a0a90ff3b",
+      "name": "Save Plan to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2064,
+        560
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "bCUleVpjRHY7rOva",
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "notes": "Saves generated plan back to the row created at intake. References Build Profile String node for session_id since LLM node output only contains content array."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  success: true,\n  session_id: $('Build Profile String').item.json.session_id,\n  staff_name: $('Build Profile String').item.json.staff_name,\n  two_week_deadline: $('Build Profile String').item.json.two_week_deadline,\n  training_plan: $('AI Agent').item.json.output\n}) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "a82adff8-7c65-4404-879f-9ce3dd650161",
+      "name": "Respond with Plan",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2304,
+        560
+      ],
+      "notes": "Returns session_id, staff_name, two_week_deadline, and full training_plan text to the frontend in one response."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Build Profile String').item.json.staff_profile }}",
+        "options": {
+          "systemMessage": "You are the CRA Training Compliance Agent for GWU MFA Clinical Research. Your sole purpose is to interpret SOP 15 v4.0 and generate a complete, personalized training plan for the staff member whose profile is provided.\n\n## YOUR RULES\n- Base every decision strictly on SOP 15 v4.0. Never invent requirements not in the SOP.\n- Never ask the user for information. The profile provided is complete and verified.\n- Never give generic advice. Every item in the plan must reference the staff member's actual role, systems, activities, and dates.\n- If onboarding_type is \"returning — gaps only\", do NOT assign trainings already marked current. Only surface gaps and upcoming renewals.\n- If third_party is \"yes\", do not generate a plan — output only: \"This staff member is governed by SOP 21. Please contact the Office of Clinical Research.\"\n\n## DECISION LOGIC — apply every rule below in order\n\n**ROUTING GATE (evaluate first)**\n- third_party = yes → stop, route to SOP 21\n\n**UNIVERSAL — assign to ALL research staff**\n- Biomedical Investigator Training (CITI) — before research involvement, renews every 2 years\n- Health Information Privacy & Security / HIPS (CITI) — before research involvement\n- Good Clinical Practice / GCP (CITI) — before research involvement, renews every 3 years — HARD EXPIRY, never let lapse\n- HIPAA Training — at hire and annually thereafter\n\n**NEW HIRE ONBOARDING — assign if onboarding_type = \"new hire — full onboarding\"**\n- Onboarding meeting with Executive Director of Clinical Research & Sr. Manager of Regulatory & Compliance — Day 1\n- Institutional SOP Review via Florence e-Binders — within 2 weeks of hire, electronically sign each SOP\n- ACRP Modules — within 2 weeks of hire, ~15 hours, register at ACRP website with GW email, select Children's National Hospital as org\n\n**PRIOR CITI TRANSFER — if prior_citi = yes**\n- Initiate CITI transfer via CITI portal before assigning new CITI courses\n- Capture ORIGINAL completion date (not transfer date) to drive renewal reminders\n- Transfer applies ONLY to CITI courses — not EPIC, OnCore, HIPAA, ACRP, or IATA\n\n**SYSTEM ACCESS — assign per system listed in system_access**\n- EPIC → EPIC Training, within 2 weeks of hire, full-day online course, schedule with IS&T Informatics Training Coordinator\n- OnCore → OnCore Training, within 2 weeks of hire, GWID required, schedule with Kate Weber (hwillis@mfa.gwu.edu)\n- RedCap → RedCap Training, before use, complete RedCap Account Agreement Form first, then online training on RedCap portal\n- iRis → iRis Account Setup, before IRB submission, contact ohrirb@email.gwu.edu\n- WIRB/Advarra → Account creation, before study activation, confirm with Regulatory team which board applies\n- Cerner Powertrials → Cerner Powertrials Training, before use, contact shahrzad@gwuhospital.com\n\n**CONDITIONAL — apply based on profile flags**\n- nih_funded = yes → Financial Conflict of Interest (CITI), before study involvement, renews every 3 years\n- specimen_handling includes category_b → IATA Shipping Infectious Substances Category B, before shipping, renews every 2 years, complete IATA Request Form and email labsafety@gwu.edu\n- specimen_handling includes dry_ice → IATA Shipping with Dry Ice, before shipping, renews every 2 years, same process — evaluate separately from Category B\n\n**AS-APPLICABLE — assign based on role and activities**\n- Blood draws in activities → Phlebotomy Skill Refresher, before performing procedure\n- Suicide/self-harm assessments in activities → C-SSRS Training, before protocol use\n- Role = Principal Investigator → PI Dashboard Training at onboarding\n- Trial registration in activities → ClinicalTrials.gov Account Setup\n- e-Consent in activities → Florence e-Consent Training, before study activation\n- Finance/travel in activities → Concur Training\n\n## OUTPUT FORMAT\nProduce the training plan as follows:\n\n---\n# Training Plan — [Staff Name]\n**Role:** [role] | **Hire Date:** [hire_date] | **2-Week Deadline:** [two_week_deadline]\n**Onboarding Type:** [onboarding_type] | **Session ID:** [session_id]\n\n---\n## ✅ Section 1 — Universal Requirements\n[list each item with: deadline, renewal cycle, how to complete]\n\n## 🆕 Section 2 — New Hire Onboarding\n[list each item with: deadline, action required]\n\n## 💻 Section 3 — System Access Training\n[only include systems from the profile — list each with: deadline, who to contact]\n\n## ⚠️ Section 4 — Conditional Requirements\n[only include triggered items — NIH COI, IATA, etc.]\n\n## 📋 Section 5 — As-Applicable Training\n[only include items triggered by role/activities]\n\n## 🔄 Section 6 — CITI Transfer Note\n[only if prior_citi = yes — explain transfer process and renewal tracking from original dates]\n\n## 📁 Section 7 — Training Records\n- General certificates: retain in single designated location, create Note to File (NTF), file NTF in regulatory binder\n- Protocol-specific training: must be filed in the corresponding protocol's regulatory binder\n- PI is responsible for verifying all team members are current before any research procedure\n\n---\n**Staff is cleared for research activities only after ALL required trainings above are verified complete.**\n---\n\n## TOOLS AVAILABLE\n\nYou have access to the following tools. Use them proactively — do not wait for the staff member to ask.\n\n### 1. `Call n8n Workflow Tool` — CRA Q&A Sub-Workflow\nCall this tool when:\n- The staff member asks a follow-up question about any training item in the plan (e.g. \"how do I register for ACRP?\", \"when does my GCP expire?\", \"where do I file my certificates?\")\n- The staff member reports completing a training item\n- The staff member asks for clarification on any SOP 15 requirement\n- Any question arrives after the initial plan has been generated\n\nHow to call it:\n- Pass `sessionId` = the session_id from the staff profile above\n- Pass `question` = the staff member's exact question or message\n- Return the tool's answer directly to the staff member — do not rephrase or summarize it unless it contains an error\n\nDo NOT call this tool to generate the initial training plan — that is your job directly.\nDo NOT call this tool for routing decisions (third-party gate, returning staff) — handle those yourself using the rules above.\n\n### TOOL CALL PRIORITY\n1. Generate the training plan yourself on first execution using the staff profile and decision logic above\n2. For every subsequent interaction in this session, delegate to the Q&A tool — it has the live Sheets record, conversation memory, and completion-logging capability"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1712,
+        560
+      ],
+      "id": "6d7bc47a-176e-4a40-9bef-da27edaac2a9",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1712,
+        736
+      ],
+      "id": "ff38df0a-14ab-4dcd-a0eb-28b72bb59d6d",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "emZbAHRiPdnRsPv0",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "620c8743-3ffb-4d48-9dd6-8034bc507a18",
+              "leftValue": "={{ $json.body.staff_name }}",
+              "rightValue": "undefined",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        288,
+        496
+      ],
+      "id": "b7e9b4ed-ff28-4e9b-b1bb-cc9b6b4d0fea",
+      "name": "If",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "extract-sid",
+              "name": "sessionId",
+              "value": "={{ $json.body.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-q",
+              "name": "question",
+              "value": "={{ $json.body.chatInput }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "10d5e20f-b750-434d-b80a-ca640322bf67",
+      "name": "Extract Inputs",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        464,
+        960
+      ],
+      "notes": "Pulls sessionId and question out of the tool call payload passed by the main AI Agent."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1xPiAbaQ_bq4ONTulobQTR3Jdz45DVWQpcxhGX3q42JE"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Training Tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xPiAbaQ_bq4ONTulobQTR3Jdz45DVWQpcxhGX3q42JE/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "session_id",
+              "lookupValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e440fdeb-cdf6-4600-bbb6-29be0c45c8d8",
+      "name": "Read All Records",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        688,
+        960
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WVbC0begMCJvuvC1",
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "notes": "Reads all rows from Training Tracker. Filter node downstream picks the matching session."
+    },
+    {
+      "parameters": {
+        "jsCode": "// sessionId comes from the Extract Inputs node (first item in workflow)\n// allRows comes from the Read All Records node output\nconst sessionId = $('Extract Inputs').first().json.sessionId;\nconst question  = $('Extract Inputs').first().json.question;\nconst allRows   = $input.all();\n\nconst match = allRows.find(row => row.json.session_id === sessionId);\n\nif (!match) {\n  return [{ json: {\n    session_id:       sessionId,\n    question:         question,\n    staff_name:       'Staff member',\n    role:             '',\n    hire_date:        '',\n    two_week_deadline:'',\n    system_access:    '',\n    specimen_handling:'',\n    nih_funded:       '',\n    session_status:   'No record found',\n    training_plan:    'No training plan found for this session. Please complete the intake form to generate your plan.',\n    onboarding_type:  ''\n  }}];\n}\n\n// Merge question into the matched record so Q&A Agent can access both\nreturn [{ json: { ...match.json, question } }];"
+      },
+      "id": "826cc9d6-8c93-4c67-a746-5f933631d907",
+      "name": "Filter Record by Session",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        960
+      ],
+      "notes": "Finds the staff record matching sessionId. Merges question into output so Q&A Agent receives both the staff profile and the question in one item."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.question }}",
+        "options": {
+          "systemMessage": "=You are the CRA Training Assistant for GWU MFA Clinical Research. You help research staff understand and complete their onboarding training requirements as defined in SOP 15 v4.0.\n\nYou have been given the following verified staff record. Do NOT ask the staff member for any of this information again — it has already been collected.\n\n---\nSTAFF RECORD:\nName: {{ $json.staff_name }}\nRole: {{ $json.role }}\nHire Date: {{ $json.hire_date }}\n2-Week Deadline: {{ $json.two_week_deadline }}\nOnboarding Type: {{ $json.onboarding_type }}\nSystem Access Needed: {{ $json.system_access }}\nSpecimen Handling: {{ $json.specimen_handling }}\nNIH-Funded Studies: {{ $json.nih_funded }}\nSession Status: {{ $json.session_status }}\nSession ID: {{ $json.session_id }}\n\nTRAINING PLAN ON FILE:\n{{ $json.training_plan }}\n\nCOMPLETIONS LOGGED:\n{{ $json.completions_log || 'None yet' }}\n---\n\nYour job:\n1. Answer questions about the training plan above — what each training is, how to register, who to contact, deadlines, and renewal cycles.\n2. If the staff member reports completing a training item, call the update_completion tool with their session_id and a log entry.\n3. Only answer questions grounded in SOP 15 v4.0. If asked something outside that scope, say so and redirect.\n4. Be concise, friendly, and specific. Always reference the staff member's actual plan — not generic advice.\n\nSOP 15 key rules to apply:\n- CITI courses (GCP, HIPS, Biomedical Investigator): complete BEFORE any research involvement. GCP renews every 3 years, Biomedical every 2 years.\n- HIPAA: annual, required for all staff.\n- ACRP: within 2 weeks of hire, ~15 hours, register at ACRP website with GW email, select Children's National Hospital.\n- EPIC: within 2 weeks of hire, schedule with IS&T Informatics Training Coordinator.\n- OnCore: within 2 weeks of hire, GWID required, schedule with Kate Weber (hwillis@mfa.gwu.edu).\n- RedCap: complete RedCap Account Agreement Form first, then online training.\n- IATA Category B: before shipping, renews every 2 years, email labsafety@gwu.edu with IATA Request Form.\n- IATA Dry Ice: separate course from Category B, same process.\n- Financial COI (CITI): only if NIH-funded, renews every 3 years.\n- SOP Review: within 2 weeks of hire via Florence e-Binders, electronically sign each SOP.\n- Third-party employees: refer to SOP 21 — SOP 15 does not apply.\n- Training records: file general records in one location with a Note to File; protocol-specific records go in the protocol regulatory binder."
+        }
+      },
+      "id": "5ef7d18d-82eb-43a7-904c-fba56af7f05d",
+      "name": "Q&A Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1072,
+        960
+      ],
+      "notes": "Answers staff questions using the live staff record as context. System prompt is fully populated with the matched Sheets row. Calls update_completion tool when staff report a completion."
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Extract Inputs').first().json.sessionId }}",
+        "contextWindowLength": 20
+      },
+      "id": "c472ef9c-b764-4d20-a964-5fe97514641e",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1168,
+        1152
+      ],
+      "notes": "Keyed by sessionId so memory is shared if the same session calls this sub-workflow multiple times in the same conversation."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "out-answer",
+              "name": "answer",
+              "value": "={{ $('Q&A Agent').first().json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "out-sid",
+              "name": "session_id",
+              "value": "={{ $('Extract Inputs').first().json.sessionId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cf4d1c21-38cc-4ef3-90ed-d9a46e84843a",
+      "name": "Return Answer",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2128,
+        944
+      ],
+      "notes": "Shapes the output returned to the calling AI Agent in the main workflow. Returns answer and session_id."
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1xPiAbaQ_bq4ONTulobQTR3Jdz45DVWQpcxhGX3q42JE",
+          "mode": "list",
+          "cachedResultName": "Training Tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xPiAbaQ_bq4ONTulobQTR3Jdz45DVWQpcxhGX3q42JE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Training Tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xPiAbaQ_bq4ONTulobQTR3Jdz45DVWQpcxhGX3q42JE/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $json.session_id }}",
+            "session_status": "Completions Reported",
+            "completions_log": "={{ $json.completions_log }}",
+            "last_updated": "={{ $now.toISO() }}",
+            "training_plan": "={{ $json.training_plan }}"
+          },
+          "matchingColumns": [
+            "session_id"
+          ],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "staff_name",
+              "displayName": "staff_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hire_date",
+              "displayName": "hire_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "two_week_deadline",
+              "displayName": "two_week_deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "third_party",
+              "displayName": "third_party",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "returning_staff",
+              "displayName": "returning_staff",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "onboarding_type",
+              "displayName": "onboarding_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "prior_citi",
+              "displayName": "prior_citi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "prior_citi_details",
+              "displayName": "prior_citi_details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "system_access",
+              "displayName": "system_access",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "activities",
+              "displayName": "activities",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "specimen_handling",
+              "displayName": "specimen_handling",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nih_funded",
+              "displayName": "nih_funded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "session_status",
+              "displayName": "session_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "training_plan",
+              "displayName": "training_plan",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "completions_log",
+              "displayName": "completions_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_updated",
+              "displayName": "last_updated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1904,
+        944
+      ],
+      "id": "28bf32be-3b06-4344-b793-5a3bef2cbad3",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WVbC0begMCJvuvC1",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.output;\nconst sessionId = $('Extract Inputs').first().json.sessionId;\nconst existingPlan = $('Filter Record by Session').first().json.training_plan || '';\nconst existingLog  = $('Filter Record by Session').first().json.completions_log || '';\n\n// ── 1. Canonical training item names to watch for ──────────────────────────\nconst TRAINING_ITEMS = [\n  { key: 'HIPAA Training',                     pattern: /hipaa/i },\n  { key: 'GCP (CITI)',                          pattern: /good clinical practice|gcp/i },\n  { key: 'Biomedical Investigator (CITI)',      pattern: /biomedical investigator/i },\n  { key: 'HIPS (CITI)',                         pattern: /health information privacy|hips/i },\n  { key: 'Financial COI (CITI)',                pattern: /financial conflict of interest|financial coi/i },\n  { key: 'ACRP Modules',                        pattern: /acrp/i },\n  { key: 'EPIC Training',                       pattern: /\\bepic\\b/i },\n  { key: 'OnCore Training',                     pattern: /oncore/i },\n  { key: 'RedCap Training',                     pattern: /redcap/i },\n  { key: 'iRis Account Setup',                  pattern: /iris|irb account/i },\n  { key: 'Cerner Powertrials Training',         pattern: /cerner/i },\n  { key: 'IATA Category B',                     pattern: /iata.*category b|category b.*iata/i },\n  { key: 'IATA Dry Ice',                        pattern: /iata.*dry ice|dry ice.*iata/i },\n  { key: 'SOP Review (Florence e-Binders)',     pattern: /sop review|florence e-binder/i },\n  { key: 'Onboarding Meeting',                  pattern: /onboarding meeting/i },\n  { key: 'Phlebotomy Skill Refresher',          pattern: /phlebotomy/i },\n  { key: 'C-SSRS Training',                     pattern: /c-ssrs/i },\n  { key: 'Florence e-Consent Training',         pattern: /e-consent/i },\n  { key: 'ClinicalTrials.gov Account Setup',    pattern: /clinicaltrials\\.gov/i },\n  { key: 'PI Dashboard Training',               pattern: /pi dashboard/i },\n  { key: 'Concur Training',                     pattern: /concur/i },\n];\n\n// ── 2. Detect if agent reply signals a completion ──────────────────────────\nconst completionSignal = /complet|finish|done|submitted|logged/i.test(output);\nif (!completionSignal) {\n  return [{ json: { session_id: sessionId, completions_log: existingLog, training_plan: existingPlan, should_update: false } }];\n}\n\n// ── 3. Identify WHICH items were completed from the agent reply ────────────\nconst today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD\nconst newEntries = [];\n\nfor (const item of TRAINING_ITEMS) {\n  if (item.pattern.test(output)) {\n    newEntries.push(`[${today}] ${item.key} — Completed (self-reported)`);\n  }\n}\n\n// Fallback: no specific item matched but reply sounds like a completion\nif (newEntries.length === 0) {\n  newEntries.push(`[${today}] Training item — Completed (self-reported; item unspecified)`);\n}\n\n// ── 4. Append to completions_log (never overwrite) ────────────────────────\nconst separator = existingLog.trim() ? '\\n' : '';\nconst updatedLog = existingLog.trim() + separator + newEntries.join('\\n');\n\n// ── 5. Mark matching items in training_plan ────────────────────────────────\n// Strategy: for each completed item, find its bullet line and append a ✅ tag\nlet updatedPlan = existingPlan;\n\nfor (const item of TRAINING_ITEMS) {\n  if (item.pattern.test(output)) {\n    // Match the bullet line(s) that contain this item name (first occurrence heading)\n    // We look for lines starting with \"- \" that contain the item pattern\n    // and insert a completion marker after the item name on that line\n    const lineRegex = new RegExp(\n      `(- (?=[^\\\\n]*(?:${item.pattern.source}))[^\\\\n]*)`,\n      'i'\n    );\n    if (lineRegex.test(updatedPlan)) {\n      updatedPlan = updatedPlan.replace(lineRegex, (match) => {\n        // Avoid double-marking\n        if (match.includes('✅ COMPLETED')) return match;\n        return match + `  ✅ COMPLETED ${today}`;\n      });\n    }\n  }\n}\n\nreturn [{\n  json: {\n    session_id:      sessionId,\n    completions_log: updatedLog,\n    training_plan:   updatedPlan,\n    should_update:   true\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        960
+      ],
+      "id": "f3d3cb79-b1d4-4cfe-adf0-ddf0a654b959",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "c32df21e-f53e-49ad-b501-25372a01cb40",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        992,
+        1152
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "emZbAHRiPdnRsPv0",
+          "name": "n8n free OpenAI API credits"
+        }
+      },
+      "notes": "Model for Q&A Agent. Using gpt-4o-mini — swap to claude-sonnet or gpt-4o if richer reasoning is needed for complex SOP questions."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "651869e7-a557-4910-b62c-3b139bec020c",
+              "leftValue": "={{ $json.should_update }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1616,
+        960
+      ],
+      "id": "450c158a-4dc4-4379-9a36-eaf9cb76a3c5",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  success: true,\n  session_id: $('Extract Inputs').item.json.sessionId,\n  answer: $json.answer\n}) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "5772292c-310b-4103-99e2-7316813d0280",
+      "name": "Respond with Plan1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2352,
+        944
+      ],
+      "notes": "Returns session_id, staff_name, two_week_deadline, and full training_plan text to the frontend in one response."
+    }
+  ],
+  "pinData": {
+    "Code in JavaScript": [
+      {
+        "json": {
+          "session_id": "session_jane_smith_20260312",
+          "completions_log": "Great job on completing your HIPAA training today!\n\nTo register for OnCore, follow these steps:\n\n1. **Email Kate Weber**: Use the email address hwillis@mfa.gwu.edu.\n2. **Include Your GWID**: Be sure to mention your GWID in the email.\n3. **Request Training**: Clearly state that you would like to schedule OnCore training.\n\nMake sure to complete this by your deadline of March 26th, 2026. If you need any further assistance, feel free to ask! \n\nI'll also log your HIPAA training completion now.\n[2026-03-12] HIPAA Training — Completed (self-reported)\n[2026-03-12] OnCore Training — Completed (self-reported)",
+          "training_plan": "---\n# Training Plan — Jane Smith\n**Role:** Clinical Research Coordinator | **Hire Date:** 2026-03-12 | **2-Week Deadline:** 03/26/2026  \n**Onboarding Type:** new hire — full onboarding | **Session ID:** N/A\n\n---\n## ✅ Section 1 — Universal Requirements\n- Biomedical Investigator Training (CITI)  \n  - Deadline: Complete before any research involvement; arrange completion by 03/26/2026 (within 2 weeks).  \n  - Renewal cycle: Every 2 years.  \n  - How to complete: Enroll in the Biomedical Investigator module via the CITI Program. NOTE: Because you have prior CITI records, initiate a CITI transfer (see Section 6) before assigning new CITI courses so original completions are captured.\n\n- Health Information Privacy & Security (HIPS) (CITI)  \n  - Deadline: Must be on file before research involvement; ensure your prior HIPS training is transferred and recognized by 03/26/2026.  \n  - Renewal cycle: (Per SOP 15 v4.0 this is a required CITI course prior to involvement; track renewals via transferred original date.)  \n  - How to complete: If transfer is successful, no new completion required now. If transfer cannot be completed, enroll in HIPS via CITI. Prior completion: 2023-03-10 at Johns Hopkins (capture via transfer).\n\n- Good Clinical Practice (GCP) (CITI) — HARD EXPIRY  \n  - Deadline: Must be current before any research involvement; ensure your prior GCP is transferred and recognized immediately (by 03/26/2026).  \n  - Renewal cycle: Every 3 years — HARD EXPIRY (do not allow to lapse).  \n  - How to complete: Transfer your prior GCP completion into GW CITI (see Section 6). Prior completion: 2024-01-15 at Johns Hopkins — current; expiry based on original date: 2027-01-15. If transfer fails, complete GCP via CITI before any research activity.\n\n- HIPAA Training    ✅ COMPLETED 2026-03-12\n  - Deadline: At hire — complete now; arrange completion by 03/26/2026. Annual thereafter.  \n  - Renewal cycle: Annually.  \n  - How to complete: Complete GW HIPAA training module assigned at hire (follow institutional onboarding links/email).\n\n---\n## 🆕 Section 2 — New Hire Onboarding\n- Onboarding meeting with Executive Director of Clinical Research & Sr. Manager of Regulatory & Compliance  \n  - Deadline: Day 1 — 03/12/2026.  \n  - Action required: Attend scheduled meeting on your hire date.\n\n- Institutional SOP Review via Florence e-Binders  \n  - Deadline: Within 2 weeks of hire — by 03/26/2026.  \n  - Action required: Electronically review and sign each SOP in Florence e-Binders.\n\n- ACRP Modules (~15 hours)  \n  - Deadline: Within 2 weeks of hire — complete by 03/26/2026.  \n  - Action required: Register at the ACRP website using your GW email and select \"Children's National Hospital\" as organization; complete assigned modules (~15 hours).\n\n---\n## 💻 Section 3 — System Access Training\n(Only systems listed in your profile are included.)\n\n- EPIC Training  \n  - Deadline: Within 2 weeks — by 03/26/2026.  \n  - Who to contact / How to complete: Schedule the full-day online EPIC course with IS&T Informatics Training Coordinator per institutional process.\n\n- OnCore Training    ✅ COMPLETED 2026-03-12\n  - Deadline: Within 2 weeks — by 03/26/2026.  \n  - Who to contact / How to complete: Requires GWID; schedule OnCore training with Kate Weber — hwillis@mfa.gwu.edu.\n\n- RedCap Training  \n  - Deadline: Before first use; complete by 03/26/2026 if you will begin data entry within two weeks.  \n  - Who to contact / How to complete: Complete the RedCap Account Agreement Form first, then complete online RedCap training via the RedCap portal.\n\n---\n## ⚠️ Section 4 — Conditional Requirements\n(Triggered by your profile)\n\n- Financial Conflict of Interest (CITI) — NIH-funded studies  \n  - Deadline: Before involvement in NIH-funded research; complete by 03/26/2026.  \n  - Renewal cycle: Every 3 years.  \n  - How to complete: Enroll in the Financial Conflict of Interest module via CITI. Initiate CITI transfer first so prior CITI record (if any) is applied (see Section 6).\n\n- IATA Shipping — Infectious Substances Category B (specimen_handling = category_b)  \n  - Deadline: Before you ship any Category B infectious materials; complete by 03/26/2026 if you will ship materials within first two weeks.  \n  - Renewal cycle: Every 2 years.  \n  - How to complete: Complete IATA Shipping Infectious Substances Category B training, submit IATA Request Form and email the completed form to labsafety@gwu.edu.\n\n---\n## 📋 Section 5 — As-Applicable Training\n(Only items triggered by your role/activities)\n\n- Specimen collection (you perform specimen collection)  \n  - Deadline: Before performing specimen collection procedures.  \n  - Action required: Ensure competency requirements for specimen collection per protocol are completed and documented in the protocol regulatory binder. (If blood draws are specifically required later, Phlebotomy Skill Refresher is required before performing that procedure — not assigned now because \"blood draws\" were not explicitly listed.)\n\n- Consenting participants (you consent participants)  \n  - Deadline: Before consenting participants for a study.  \n  - Action required: Complete study-specific consent training and file in the corresponding protocol regulatory binder. (Florence e-Consent training is required only if e-Consent is used; not assigned unless e-Consent is part of a protocol.)\n\n- Data entry  \n  - Deadline: Before performing data entry on study databases.  \n  - Action required: Complete system-specific training (RedCap, OnCore) and study-specific data entry SOPs as applicable.\n\n---\n## 🔄 Section 6 — CITI Transfer Note\n(You indicated prior CITI training. Follow this process before assigning or completing new CITI courses.)\n\n- Initiate a CITI transfer via the CITI portal immediately (before assigning new CITI courses to your GW account).  \n- Capture ORIGINAL completion dates (not transfer dates) so renewal cycles are tracked from those original dates. Your prior CITI completions to transfer:  \n  - GCP — completed 2024-01-15 at Johns Hopkins (expiry 3 years from original date → 2027-01-15). This is a HARD EXPIRY course; ensure it remains current.  \n  - HIPS — completed 2023-03-10 at Johns Hopkins. (Transfer to capture original date for institutional tracking.)  \n- Note: CITI transfer applies ONLY to CITI courses. It does not apply to EPIC, OnCore, HIPAA, ACRP, or IATA trainings.\n\n---\n## 📁 Section 7 — Training Records\n- General certificates: retain all CITI, HIPAA, ACRP, IATA, and other general training certificates in a single designated location; create a Note to File (NTF) referencing where each certificate is stored; file the NTF in the regulatory binder.  \n- Protocol-specific training: must be filed in the corresponding protocol's regulatory binder (consent training, specimen handling competency, protocol-specific data entry instructions, etc.).  \n- Responsibility: The PI is responsible for verifying all team members are current before any research procedure.\n\n---\n**Staff is cleared for research activities only after ALL required trainings above are verified complete.**\n---",
+          "should_update": true
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Intake Webhook": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate 1: Third Party?": {
+      "main": [
+        [
+          {
+            "node": "Respond: Route to SOP 21",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gate 2: Returning Staff?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate 2: Returning Staff?": {
+      "main": [
+        [
+          {
+            "node": "Set Fields (Returning)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Fields (New Hire)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fields (Returning)": {
+      "main": [
+        [
+          {
+            "node": "Save Intake to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fields (New Hire)": {
+      "main": [
+        [
+          {
+            "node": "Save Intake to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Intake to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Build Profile String",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Plan to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Respond with Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Profile String": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Save Plan to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Gate 1: Third Party?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Inputs": {
+      "main": [
+        [
+          {
+            "node": "Read All Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Records": {
+      "main": [
+        [
+          {
+            "node": "Filter Record by Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Record by Session": {
+      "main": [
+        [
+          {
+            "node": "Q&A Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q&A Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Q&A Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Return Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Q&A Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Answer": {
+      "main": [
+        [
+          {
+            "node": "Respond with Plan1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ba908e33-236e-4889-b7f0-a18d750f6a41",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4c717bb0649b4c4dc36ee54b7ef199684bb344fc43b3baad1ba002fec74abf71"
+  },
+  "id": "T8XCSiknfvdnjCVL",
+  "tags": []
+}
