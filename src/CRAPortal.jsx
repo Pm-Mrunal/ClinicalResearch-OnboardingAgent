@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 // Relative paths — Vite dev server proxies /webhook/* → https://pallavi04.app.n8n.cloud
 // This avoids CORS errors when running on localhost.
-const N8N_CHAT_WEBHOOK = "https://pallavi04.app.n8n.cloud/webhook/cra-intake";
+const N8N_CHAT_WEBHOOK = "/webhook/cra-intake";
 const N8N_DASHBOARD_WEBHOOK = "/webhook/cra-intake";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -257,21 +257,8 @@ function LandingView({ onStaff, onManager }) {
 
 // ─── STAFF PORTAL ─────────────────────────────────────────────────────────────
 function StaffPortal({ onBack, staffName, setStaffName }) {
-  const [phase, setPhase] = useState("intake"); // intake | summary | generating | chat
-  const [staffNameInput, setStaffNameInput] = useState(staffName);
-  const [intakeStep, setIntakeStep] = useState(0);
-  const [intakeData, setIntakeData] = useState({
-    staff_name: "",
-    third_party: "",
-    returning_staff: "",
-    role: "",
-    hire_date: "",
-    system_access: [],
-    nih_funded: "",
-    activities: [],
-    prior_citi: "",
-    prior_citi_details: ""
-  });
+  const [phase, setPhase] = useState("entry"); // entry | chat
+  const [nameInput, setNameInput] = useState(staffName);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -287,6 +274,7 @@ function StaffPortal({ onBack, staffName, setStaffName }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // Infer progress from message count
   useEffect(() => {
     if (messageCount >= 1) setProgressStep(1);
     if (messageCount >= 3) setProgressStep(2);
@@ -294,165 +282,24 @@ function StaffPortal({ onBack, staffName, setStaffName }) {
     if (planGenerated) setProgressStep(4);
   }, [messageCount, planGenerated]);
 
-  const INTAKE_FORM_STEPS = [
-    {
-      question: "Are you a GWU/MFA employee or an external/vendor contractor?",
-      key: "third_party",
-      type: "radio",
-      options: [
-        { label: "GWU/MFA Employee", value: "no" },
-        { label: "External / Vendor Staff", value: "yes" }
-      ]
-    },
-    {
-      question: "Is this your first time joining the team, or are you returning staff?",
-      key: "returning_staff",
-      type: "radio",
-      options: [
-        { label: "New Hire", value: "no" },
-        { label: "Returning Staff", value: "yes" }
-      ]
-    },
-    {
-      question: "What is your role?",
-      key: "role",
-      type: "radio",
-      options: [
-        { label: "Clinical Research Coordinator", value: "Clinical Research Coordinator" },
-        { label: "Research Nurse", value: "Research Nurse" },
-        { label: "Data Coordinator", value: "Data Coordinator" },
-        { label: "Research Assistant", value: "Research Assistant" },
-        { label: "Principal Investigator", value: "Principal Investigator" },
-        { label: "Other", value: "Other" }
-      ]
-    },
-    {
-      question: "What is your hire date?",
-      key: "hire_date",
-      type: "date"
-    },
-    {
-      question: "Which systems will you need access to? (select all that apply)",
-      key: "system_access",
-      type: "checkbox",
-      options: [
-        { label: "EPIC", value: "EPIC" },
-        { label: "OnCore", value: "OnCore" },
-        { label: "RedCap", value: "RedCap" },
-        { label: "iRis", value: "iRis" },
-        { label: "Cerner Powertrials", value: "Cerner Powertrials" },
-        { label: "None", value: "None" }
-      ]
-    },
-    {
-      question: "Will you be involved in any NIH-funded studies?",
-      key: "nih_funded",
-      type: "radio",
-      options: [
-        { label: "Yes", value: "yes" },
-        { label: "No", value: "no" },
-        { label: "Not sure", value: "not sure" }
-      ]
-    },
-    {
-      question: "What activities will you perform? (select all that apply)",
-      key: "activities",
-      type: "checkbox",
-      options: [
-        { label: "Consenting participants", value: "Consenting participants" },
-        { label: "Data entry", value: "Data entry" },
-        { label: "Specimen collection", value: "Specimen collection" },
-        { label: "Blood draws", value: "Blood draws" },
-        { label: "Shipping biological specimens", value: "Shipping biological specimens" }
-      ]
-    },
-    {
-      question: "Do you have any prior CITI training from a previous institution?",
-      key: "prior_citi",
-      type: "radio",
-      options: [
-        { label: "Yes", value: "yes" },
-        { label: "No", value: "no" }
-      ]
-    }
-  ];
-
-  function updateIntakeData(key, value) {
-    setIntakeData(prev => ({ ...prev, [key]: value }));
-  }
-
-  function toggleCheckbox(key, value) {
-    setIntakeData(prev => {
-      const arr = prev[key] || [];
-      if (arr.includes(value)) {
-        return { ...prev, [key]: arr.filter(v => v !== value) };
-      } else {
-        return { ...prev, [key]: [...arr, value] };
-      }
-    });
-  }
-
-  function nextIntakeStep() {
-    const currentStep = INTAKE_FORM_STEPS[intakeStep];
-    if (!currentStep) return;
-
-    if (currentStep.type === "radio" && !intakeData[currentStep.key]) return;
-    if (currentStep.type === "date" && !intakeData[currentStep.key]) return;
-    if (currentStep.type === "checkbox" && (!intakeData[currentStep.key] || intakeData[currentStep.key].length === 0)) return;
-
-    if (intakeStep === INTAKE_FORM_STEPS.length - 1) {
-      setPhase("summary");
-    } else {
-      setIntakeStep(intakeStep + 1);
-    }
-  }
-
-  function prevIntakeStep() {
-    if (intakeStep > 0) setIntakeStep(intakeStep - 1);
-  }
-
   async function startChat() {
-    if (!staffNameInput.trim()) return;
-    const name = staffNameInput.trim();
+    if (!nameInput.trim()) return;
+    const name = nameInput.trim();
     setStaffName(name);
     setStoredName(name);
+    setPhase("chat");
 
-    setPhase("generating");
+    const greeting = `Hi, I'm ${name}. I'm a new hire and I need to complete my onboarding training.`;
     setLoading(true);
-
     try {
-      const payload = {
-        chatInput: "Generate my training plan",
-        sessionId: sessionId.current,
-        action: "sendMessage",
-        staff_name: name,
-        third_party: intakeData.third_party,
-        returning_staff: intakeData.returning_staff,
-        role: intakeData.role,
-        hire_date: intakeData.hire_date,
-        system_access: intakeData.system_access.join(", "),
-        nih_funded: intakeData.nih_funded,
-        activities: intakeData.activities.join(", "),
-        prior_citi: intakeData.prior_citi,
-        prior_citi_details: intakeData.prior_citi_details
-      };
-
-      const reply = await callN8n(payload.chatInput, sessionId.current, payload);
+      const reply = await callN8n(greeting, sessionId.current);
       setMessages([
+        { role: "user", content: greeting },
         { role: "assistant", content: reply }
       ]);
       setMessageCount(1);
-
-      if (detectPlanInMessage(reply)) {
-        setPlanGenerated(true);
-        const items = extractChecklistItems(reply);
-        if (items.length > 0) setChecklist(items);
-      }
-
-      setPhase("chat");
     } catch (e) {
       setMessages([{ role: "assistant", content: "⚠ Could not connect to the training agent. Please check your connection and try again, or contact the Office of Clinical Research." }]);
-      setPhase("chat");
     }
     setLoading(false);
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -490,159 +337,46 @@ function StaffPortal({ onBack, staffName, setStaffName }) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   }
 
-  // Intake form
-  if (phase === "intake") {
-    const currentStep = INTAKE_FORM_STEPS[intakeStep];
-    const progressPercent = ((intakeStep + 1) / INTAKE_FORM_STEPS.length) * 100;
-
+  // Entry screen
+  if (phase === "entry") {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#F4F6FA" }}>
-        <div style={{ background: "#0D1F3C", color: "white", padding: "0 24px", height: 56, display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-          <button onClick={onBack} style={{ background: "none", border: "none", color: "rgba(255,255,255,.5)", cursor: "pointer", fontSize: 18, padding: 4, lineHeight: 1 }}>←</button>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: .2 }}>CRA Training Intake</div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,.4)" }}>Step {intakeStep + 1} of {INTAKE_FORM_STEPS.length}</div>
-          </div>
-        </div>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F4F6FA", padding: 24 }}>
+        <div style={{ width: "100%", maxWidth: 440 }} className="fade-up">
+          <button onClick={onBack} style={{ background: "none", border: "none", color: "#4A7FA5", cursor: "pointer", fontSize: 13, marginBottom: 24, padding: 0, display: "flex", alignItems: "center", gap: 6 }}>
+            ← Back
+          </button>
+          <div style={{ background: "white", borderRadius: 20, padding: "44px 40px", boxShadow: "0 8px 40px rgba(13,31,60,.1)", border: "1px solid #E4EAF4" }}>
+            <div style={{ width: 52, height: 52, background: "linear-gradient(135deg, #0D1F3C, #2C5F8A)", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 24 }}>⚕</div>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 700, color: "#0D1F3C", marginBottom: 8 }}>Welcome to your<br />onboarding</h2>
+            <p style={{ color: "#6B7FA3", fontSize: 14, lineHeight: 1.65, marginBottom: 32 }}>
+              I'll guide you through your required training under SOP 15 v4.0. The intake takes about 3–5 minutes and generates a personalized compliance checklist.
+            </p>
 
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-          <div style={{ width: "100%", maxWidth: 500 }} className="fade-up">
-            <div style={{ background: "white", borderRadius: 20, padding: "44px 40px", boxShadow: "0 8px 40px rgba(13,31,60,.1)", border: "1px solid #E4EAF4" }}>
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ height: 4, background: "#E4EAF4", borderRadius: 2, overflow: "hidden" }}>
-                  <div style={{ height: "100%", background: "#0D1F3C", width: `${progressPercent}%`, transition: "width .3s" }} />
-                </div>
-                <div style={{ fontSize: 11, color: "#9BAEC8", marginTop: 8 }}>Step {intakeStep + 1} of {INTAKE_FORM_STEPS.length}</div>
-              </div>
-
-              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 700, color: "#0D1F3C", marginBottom: 28, lineHeight: 1.4 }}>
-                {currentStep.question}
-              </h2>
-
-              {intakeStep === 0 && (
-                <div style={{ marginBottom: 28 }}>
-                  {currentStep.options.map(opt => (
-                    <label key={opt.value} style={{ display: "flex", alignItems: "center", padding: "12px 16px", margin: "8px 0", borderRadius: 10, border: `2px solid ${intakeData.third_party === opt.value ? "#4A7FA5" : "#E4EAF4"}`, background: intakeData.third_party === opt.value ? "#EBF3FA" : "transparent", cursor: "pointer", transition: "all .2s" }}>
-                      <input type="radio" name="third_party" value={opt.value} checked={intakeData.third_party === opt.value} onChange={e => updateIntakeData("third_party", e.target.value)} style={{ marginRight: 12, cursor: "pointer", accentColor: "#0D1F3C" }} />
-                      <span style={{ fontSize: 14, fontWeight: 500, color: "#0D1F3C" }}>{opt.label}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {intakeStep > 0 && intakeStep < INTAKE_FORM_STEPS.length && (
-                <>
-                  {currentStep.type === "radio" && (
-                    <div style={{ marginBottom: 28 }}>
-                      {currentStep.options.map(opt => (
-                        <label key={opt.value} style={{ display: "flex", alignItems: "center", padding: "12px 16px", margin: "8px 0", borderRadius: 10, border: `2px solid ${intakeData[currentStep.key] === opt.value ? "#4A7FA5" : "#E4EAF4"}`, background: intakeData[currentStep.key] === opt.value ? "#EBF3FA" : "transparent", cursor: "pointer", transition: "all .2s" }}>
-                          <input type="radio" name={currentStep.key} value={opt.value} checked={intakeData[currentStep.key] === opt.value} onChange={e => updateIntakeData(currentStep.key, e.target.value)} style={{ marginRight: 12, cursor: "pointer", accentColor: "#0D1F3C" }} />
-                          <span style={{ fontSize: 14, fontWeight: 500, color: "#0D1F3C" }}>{opt.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-
-                  {currentStep.type === "date" && (
-                    <div style={{ marginBottom: 28 }}>
-                      <input type="date" value={intakeData[currentStep.key]} onChange={e => updateIntakeData(currentStep.key, e.target.value)} style={{ width: "100%", padding: "13px 16px", borderRadius: 10, border: "1.5px solid #D1DCF0", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#0D1F3C", transition: "border-color .2s" }} onFocus={e => e.target.style.borderColor = "#4A7FA5"} onBlur={e => e.target.style.borderColor = "#D1DCF0"} autoFocus />
-                    </div>
-                  )}
-
-                  {currentStep.type === "checkbox" && (
-                    <div style={{ marginBottom: 28 }}>
-                      {currentStep.options.map(opt => (
-                        <label key={opt.value} style={{ display: "flex", alignItems: "center", padding: "12px 16px", margin: "8px 0", borderRadius: 10, border: `2px solid ${intakeData[currentStep.key]?.includes(opt.value) ? "#4A7FA5" : "#E4EAF4"}`, background: intakeData[currentStep.key]?.includes(opt.value) ? "#EBF3FA" : "transparent", cursor: "pointer", transition: "all .2s" }}>
-                          <input type="checkbox" checked={intakeData[currentStep.key]?.includes(opt.value) || false} onChange={() => toggleCheckbox(currentStep.key, opt.value)} style={{ marginRight: 12, cursor: "pointer", accentColor: "#0D1F3C" }} />
-                          <span style={{ fontSize: 14, fontWeight: 500, color: "#0D1F3C" }}>{opt.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {intakeStep === INTAKE_FORM_STEPS.length - 1 && intakeData.prior_citi === "yes" && (
-                <div style={{ marginBottom: 28 }}>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#0D1F3C", marginBottom: 8, textTransform: "uppercase", letterSpacing: .5 }}>Describe your prior CITI training</label>
-                  <textarea value={intakeData.prior_citi_details} onChange={e => updateIntakeData("prior_citi_details", e.target.value)} placeholder="e.g. GCP completed 2024 at Johns Hopkins" rows={3} style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1.5px solid #D1DCF0", fontSize: 14, fontFamily: "inherit", resize: "none", outline: "none", color: "#0D1F3C", transition: "border-color .2s" }} onFocus={e => e.target.style.borderColor = "#4A7FA5"} onBlur={e => e.target.style.borderColor = "#D1DCF0"} />
-                </div>
-              )}
-
-              <div style={{ display: "flex", gap: 12 }}>
-                <button onClick={prevIntakeStep} disabled={intakeStep === 0} style={{ flex: 1, background: intakeStep === 0 ? "#F0F4FA" : "transparent", color: intakeStep === 0 ? "#C7D4E4" : "#0D1F3C", border: "1.5px solid #C7D4E4", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 600, cursor: intakeStep === 0 ? "default" : "pointer", fontFamily: "inherit", transition: "all .2s" }}>
-                  ← Back
-                </button>
-                <button onClick={nextIntakeStep} style={{ flex: 1, background: "#0D1F3C", color: "white", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
-                  {intakeStep === INTAKE_FORM_STEPS.length - 1 ? "Review Answers →" : "Next →"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Summary screen
-  if (phase === "summary") {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#F4F6FA" }}>
-        <div style={{ background: "#0D1F3C", color: "white", padding: "0 24px", height: 56, display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-          <button onClick={() => setPhase("intake")} style={{ background: "none", border: "none", color: "rgba(255,255,255,.5)", cursor: "pointer", fontSize: 18, padding: 4, lineHeight: 1 }}>←</button>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: .2 }}>Review Your Answers</div>
-          </div>
-        </div>
-
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-          <div style={{ width: "100%", maxWidth: 540 }} className="fade-up">
-            <div style={{ background: "white", borderRadius: 20, padding: "44px 40px", boxShadow: "0 8px 40px rgba(13,31,60,.1)", border: "1px solid #E4EAF4" }}>
-              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, color: "#0D1F3C", marginBottom: 28 }}>Your Information</h2>
-
-              <div style={{ marginBottom: 32 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#9BAEC8", textTransform: "uppercase", letterSpacing: .5 }}>Full Name</label>
-                <input value={staffNameInput} onChange={e => setStaffNameInput(e.target.value)} placeholder="e.g. Jane Smith" style={{ width: "100%", padding: "13px 16px", borderRadius: 10, border: "1.5px solid #D1DCF0", fontSize: 14, outline: "none", marginTop: 8, fontFamily: "inherit", color: "#0D1F3C", transition: "border-color .2s" }} onFocus={e => e.target.style.borderColor = "#4A7FA5"} onBlur={e => e.target.style.borderColor = "#D1DCF0"} />
-              </div>
-
-              {[
-                { label: "Employee Type", value: intakeData.third_party === "no" ? "GWU/MFA Employee" : "External / Vendor Staff" },
-                { label: "Staff Status", value: intakeData.returning_staff === "no" ? "New Hire" : "Returning Staff" },
-                { label: "Role", value: intakeData.role },
-                { label: "Hire Date", value: intakeData.hire_date },
-                { label: "System Access", value: intakeData.system_access.join(", ") || "None" },
-                { label: "NIH-Funded Studies", value: intakeData.nih_funded.charAt(0).toUpperCase() + intakeData.nih_funded.slice(1) },
-                { label: "Activities", value: intakeData.activities.join(", ") || "None" },
-                { label: "Prior CITI Training", value: intakeData.prior_citi === "yes" ? "Yes" : "No" },
-                ...(intakeData.prior_citi === "yes" ? [{ label: "Details", value: intakeData.prior_citi_details }] : [])
-              ].map((item, i) => (
-                <div key={i} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: i < 8 ? "1px solid #F0F4FA" : "none" }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#9BAEC8", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>{item.label}</div>
-                  <div style={{ fontSize: 14, color: "#0D1F3C", fontWeight: 500 }}>{item.value}</div>
-                </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 28, flexWrap: "wrap" }}>
+              {["~5 min intake", "Personalized plan", "Deadline calculator"].map(t => (
+                <span key={t} className="tag">{t}</span>
               ))}
-
-              <button onClick={() => setPhase("intake")} style={{ width: "100%", background: "transparent", color: "#0D1F3C", border: "1.5px solid #C7D4E4", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 12, transition: "all .2s" }}>
-                ← Edit Answers
-              </button>
-              <button onClick={startChat} disabled={!staffNameInput.trim()} style={{ width: "100%", background: "#0D1F3C", color: "white", border: "none", borderRadius: 10, padding: "14px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: staffNameInput.trim() ? 1 : 0.5 }}>
-                Generate My Training Plan →
-              </button>
             </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  // Generating screen
-  if (phase === "generating") {
-    return (
-      <div style={{ height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#F4F6FA" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ width: 60, height: 60, background: "linear-gradient(135deg, #0D1F3C, #2C5F8A)", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 24px", animation: "pulse 2s infinite" }}>⚕</div>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, color: "#0D1F3C", marginBottom: 12 }}>Generating your personalized training plan…</h2>
-          <p style={{ color: "#6B7FA3", fontSize: 14, lineHeight: 1.65 }}>This should take about 10 seconds</p>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#0D1F3C", marginBottom: 8, textTransform: "uppercase", letterSpacing: .5 }}>Your full name</label>
+            <input
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && startChat()}
+              placeholder="e.g. Jane Smith"
+              style={{ width: "100%", padding: "13px 16px", borderRadius: 10, border: "1.5px solid #D1DCF0", fontSize: 14, outline: "none", marginBottom: 16, fontFamily: "inherit", color: "#0D1F3C", transition: "border-color .2s" }}
+              onFocus={e => e.target.style.borderColor = "#4A7FA5"}
+              onBlur={e => e.target.style.borderColor = "#D1DCF0"}
+              autoFocus
+            />
+            <button className="btn-primary" onClick={startChat} disabled={!nameInput.trim()} style={{ width: "100%", padding: "14px", fontSize: 15, opacity: nameInput.trim() ? 1 : 0.5 }}>
+              Start Onboarding Intake →
+            </button>
+
+            <p style={{ textAlign: "center", fontSize: 11, color: "#9BAEC8", marginTop: 20 }}>
+              Returning staff? Just enter your name and mention you're returning when asked.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -992,17 +726,15 @@ function ManagerDashboard({ onBack }) {
 //   - An object: { output, text, message, answer, ... }
 // For new-hire plan responses the full training_plan markdown is in training_plan field.
 // For Q&A follow-ups the reply is in the answer field.
-async function callN8n(message, sessionId, intakePayload) {
-  const body = intakePayload || {
-    chatInput: message,
-    sessionId: sessionId,
-    action: "sendMessage"
-  };
-
+async function callN8n(message, sessionId) {
   const res = await fetch(N8N_CHAT_WEBHOOK, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
+    body: JSON.stringify({
+      chatInput: message,
+      sessionId: sessionId,
+      action: "sendMessage"
+    })
   });
   if (!res.ok) throw new Error("n8n request failed");
   const raw = await res.json();
