@@ -847,7 +847,10 @@ function ManagerDashboard({ onBack }) {
         }));
       setData(mapped);
       setLastRefresh(new Date());
-    }
+    }catch (e) {
+  setData(MOCK_RECORDS);
+  setLastRefresh(new Date());
+}
     setLoading(false);
   }, []);
 
