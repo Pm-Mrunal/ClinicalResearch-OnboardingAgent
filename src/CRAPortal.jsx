@@ -258,10 +258,9 @@ function LandingView({ onStaff, onManager }) {
 // ─── STAFF PORTAL ─────────────────────────────────────────────────────────────
 function StaffPortal({ onBack, staffName, setStaffName }) {
   const [phase, setPhase] = useState("intake"); // intake | summary | generating | chat
-  const [staffNameInput, setStaffNameInput] = useState(staffName);
   const [intakeStep, setIntakeStep] = useState(0);
   const [intakeData, setIntakeData] = useState({
-    staff_name: "",
+    staff_name: staffName,
     third_party: "",
     returning_staff: "",
     role: "",
@@ -295,6 +294,12 @@ function StaffPortal({ onBack, staffName, setStaffName }) {
   }, [messageCount, planGenerated]);
 
   const INTAKE_FORM_STEPS = [
+    {
+      question: "What is your full name?",
+      key: "staff_name",
+      type: "text",
+      placeholder: "e.g. Jane Smith"
+    },
     {
       question: "Are you a GWU/MFA employee or an external/vendor contractor?",
       key: "third_party",
@@ -396,6 +401,7 @@ function StaffPortal({ onBack, staffName, setStaffName }) {
     const currentStep = INTAKE_FORM_STEPS[intakeStep];
     if (!currentStep) return;
 
+    if (currentStep.type === "text" && !intakeData[currentStep.key]?.trim()) return;
     if (currentStep.type === "radio" && !intakeData[currentStep.key]) return;
     if (currentStep.type === "date" && !intakeData[currentStep.key]) return;
     if (currentStep.type === "checkbox" && (!intakeData[currentStep.key] || intakeData[currentStep.key].length === 0)) return;
@@ -412,8 +418,8 @@ function StaffPortal({ onBack, staffName, setStaffName }) {
   }
 
   async function startChat() {
-    if (!staffNameInput.trim()) return;
-    const name = staffNameInput.trim();
+    if (!intakeData.staff_name?.trim()) return;
+    const name = intakeData.staff_name.trim();
     setStaffName(name);
     setStoredName(name);
 
@@ -519,47 +525,38 @@ function StaffPortal({ onBack, staffName, setStaffName }) {
                 {currentStep.question}
               </h2>
 
-              {intakeStep === 0 && (
+              {currentStep.type === "text" && (
+                <div style={{ marginBottom: 28 }}>
+                  <input type="text" value={intakeData[currentStep.key]} onChange={e => updateIntakeData(currentStep.key, e.target.value)} onKeyDown={e => e.key === "Enter" && nextIntakeStep()} placeholder={currentStep.placeholder} style={{ width: "100%", padding: "13px 16px", borderRadius: 10, border: "1.5px solid #D1DCF0", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#0D1F3C", transition: "border-color .2s" }} onFocus={e => e.target.style.borderColor = "#4A7FA5"} onBlur={e => e.target.style.borderColor = "#D1DCF0"} autoFocus />
+                </div>
+              )}
+
+              {currentStep.type === "radio" && (
                 <div style={{ marginBottom: 28 }}>
                   {currentStep.options.map(opt => (
-                    <label key={opt.value} style={{ display: "flex", alignItems: "center", padding: "12px 16px", margin: "8px 0", borderRadius: 10, border: `2px solid ${intakeData.third_party === opt.value ? "#4A7FA5" : "#E4EAF4"}`, background: intakeData.third_party === opt.value ? "#EBF3FA" : "transparent", cursor: "pointer", transition: "all .2s" }}>
-                      <input type="radio" name="third_party" value={opt.value} checked={intakeData.third_party === opt.value} onChange={e => updateIntakeData("third_party", e.target.value)} style={{ marginRight: 12, cursor: "pointer", accentColor: "#0D1F3C" }} />
+                    <label key={opt.value} style={{ display: "flex", alignItems: "center", padding: "12px 16px", margin: "8px 0", borderRadius: 10, border: `2px solid ${intakeData[currentStep.key] === opt.value ? "#4A7FA5" : "#E4EAF4"}`, background: intakeData[currentStep.key] === opt.value ? "#EBF3FA" : "transparent", cursor: "pointer", transition: "all .2s" }}>
+                      <input type="radio" name={currentStep.key} value={opt.value} checked={intakeData[currentStep.key] === opt.value} onChange={e => updateIntakeData(currentStep.key, e.target.value)} style={{ marginRight: 12, cursor: "pointer", accentColor: "#0D1F3C" }} />
                       <span style={{ fontSize: 14, fontWeight: 500, color: "#0D1F3C" }}>{opt.label}</span>
                     </label>
                   ))}
                 </div>
               )}
 
-              {intakeStep > 0 && intakeStep < INTAKE_FORM_STEPS.length && (
-                <>
-                  {currentStep.type === "radio" && (
-                    <div style={{ marginBottom: 28 }}>
-                      {currentStep.options.map(opt => (
-                        <label key={opt.value} style={{ display: "flex", alignItems: "center", padding: "12px 16px", margin: "8px 0", borderRadius: 10, border: `2px solid ${intakeData[currentStep.key] === opt.value ? "#4A7FA5" : "#E4EAF4"}`, background: intakeData[currentStep.key] === opt.value ? "#EBF3FA" : "transparent", cursor: "pointer", transition: "all .2s" }}>
-                          <input type="radio" name={currentStep.key} value={opt.value} checked={intakeData[currentStep.key] === opt.value} onChange={e => updateIntakeData(currentStep.key, e.target.value)} style={{ marginRight: 12, cursor: "pointer", accentColor: "#0D1F3C" }} />
-                          <span style={{ fontSize: 14, fontWeight: 500, color: "#0D1F3C" }}>{opt.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
+              {currentStep.type === "date" && (
+                <div style={{ marginBottom: 28 }}>
+                  <input type="date" value={intakeData[currentStep.key]} onChange={e => updateIntakeData(currentStep.key, e.target.value)} style={{ width: "100%", padding: "13px 16px", borderRadius: 10, border: "1.5px solid #D1DCF0", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#0D1F3C", transition: "border-color .2s" }} onFocus={e => e.target.style.borderColor = "#4A7FA5"} onBlur={e => e.target.style.borderColor = "#D1DCF0"} autoFocus />
+                </div>
+              )}
 
-                  {currentStep.type === "date" && (
-                    <div style={{ marginBottom: 28 }}>
-                      <input type="date" value={intakeData[currentStep.key]} onChange={e => updateIntakeData(currentStep.key, e.target.value)} style={{ width: "100%", padding: "13px 16px", borderRadius: 10, border: "1.5px solid #D1DCF0", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#0D1F3C", transition: "border-color .2s" }} onFocus={e => e.target.style.borderColor = "#4A7FA5"} onBlur={e => e.target.style.borderColor = "#D1DCF0"} autoFocus />
-                    </div>
-                  )}
-
-                  {currentStep.type === "checkbox" && (
-                    <div style={{ marginBottom: 28 }}>
-                      {currentStep.options.map(opt => (
-                        <label key={opt.value} style={{ display: "flex", alignItems: "center", padding: "12px 16px", margin: "8px 0", borderRadius: 10, border: `2px solid ${intakeData[currentStep.key]?.includes(opt.value) ? "#4A7FA5" : "#E4EAF4"}`, background: intakeData[currentStep.key]?.includes(opt.value) ? "#EBF3FA" : "transparent", cursor: "pointer", transition: "all .2s" }}>
-                          <input type="checkbox" checked={intakeData[currentStep.key]?.includes(opt.value) || false} onChange={() => toggleCheckbox(currentStep.key, opt.value)} style={{ marginRight: 12, cursor: "pointer", accentColor: "#0D1F3C" }} />
-                          <span style={{ fontSize: 14, fontWeight: 500, color: "#0D1F3C" }}>{opt.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </>
+              {currentStep.type === "checkbox" && (
+                <div style={{ marginBottom: 28 }}>
+                  {currentStep.options.map(opt => (
+                    <label key={opt.value} style={{ display: "flex", alignItems: "center", padding: "12px 16px", margin: "8px 0", borderRadius: 10, border: `2px solid ${intakeData[currentStep.key]?.includes(opt.value) ? "#4A7FA5" : "#E4EAF4"}`, background: intakeData[currentStep.key]?.includes(opt.value) ? "#EBF3FA" : "transparent", cursor: "pointer", transition: "all .2s" }}>
+                      <input type="checkbox" checked={intakeData[currentStep.key]?.includes(opt.value) || false} onChange={() => toggleCheckbox(currentStep.key, opt.value)} style={{ marginRight: 12, cursor: "pointer", accentColor: "#0D1F3C" }} />
+                      <span style={{ fontSize: 14, fontWeight: 500, color: "#0D1F3C" }}>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
               )}
 
               {intakeStep === INTAKE_FORM_STEPS.length - 1 && intakeData.prior_citi === "yes" && (
@@ -600,12 +597,8 @@ function StaffPortal({ onBack, staffName, setStaffName }) {
             <div style={{ background: "white", borderRadius: 20, padding: "44px 40px", boxShadow: "0 8px 40px rgba(13,31,60,.1)", border: "1px solid #E4EAF4" }}>
               <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, color: "#0D1F3C", marginBottom: 28 }}>Your Information</h2>
 
-              <div style={{ marginBottom: 32 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#9BAEC8", textTransform: "uppercase", letterSpacing: .5 }}>Full Name</label>
-                <input value={staffNameInput} onChange={e => setStaffNameInput(e.target.value)} placeholder="e.g. Jane Smith" style={{ width: "100%", padding: "13px 16px", borderRadius: 10, border: "1.5px solid #D1DCF0", fontSize: 14, outline: "none", marginTop: 8, fontFamily: "inherit", color: "#0D1F3C", transition: "border-color .2s" }} onFocus={e => e.target.style.borderColor = "#4A7FA5"} onBlur={e => e.target.style.borderColor = "#D1DCF0"} />
-              </div>
-
               {[
+                { label: "Full Name", value: intakeData.staff_name },
                 { label: "Employee Type", value: intakeData.third_party === "no" ? "GWU/MFA Employee" : "External / Vendor Staff" },
                 { label: "Staff Status", value: intakeData.returning_staff === "no" ? "New Hire" : "Returning Staff" },
                 { label: "Role", value: intakeData.role },
@@ -616,7 +609,7 @@ function StaffPortal({ onBack, staffName, setStaffName }) {
                 { label: "Prior CITI Training", value: intakeData.prior_citi === "yes" ? "Yes" : "No" },
                 ...(intakeData.prior_citi === "yes" ? [{ label: "Details", value: intakeData.prior_citi_details }] : [])
               ].map((item, i) => (
-                <div key={i} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: i < 8 ? "1px solid #F0F4FA" : "none" }}>
+                <div key={i} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: i < 9 ? "1px solid #F0F4FA" : "none" }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: "#9BAEC8", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>{item.label}</div>
                   <div style={{ fontSize: 14, color: "#0D1F3C", fontWeight: 500 }}>{item.value}</div>
                 </div>
@@ -625,7 +618,7 @@ function StaffPortal({ onBack, staffName, setStaffName }) {
               <button onClick={() => setPhase("intake")} style={{ width: "100%", background: "transparent", color: "#0D1F3C", border: "1.5px solid #C7D4E4", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 12, transition: "all .2s" }}>
                 ← Edit Answers
               </button>
-              <button onClick={startChat} disabled={!staffNameInput.trim()} style={{ width: "100%", background: "#0D1F3C", color: "white", border: "none", borderRadius: 10, padding: "14px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: staffNameInput.trim() ? 1 : 0.5 }}>
+              <button onClick={startChat} style={{ width: "100%", background: "#0D1F3C", color: "white", border: "none", borderRadius: 10, padding: "14px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 Generate My Training Plan →
               </button>
             </div>
