@@ -829,7 +829,7 @@ function ManagerDashboard({ onBack }) {
       });
       if (!res.ok) throw new Error("Dashboard unavailable");
       const raw = await res.json();
-      const rows = Array.isArray(raw) ? raw : (raw.records || []);
+      const rows = Array.isArray(raw) ? raw : raw.records ? raw.records : [raw];
       const mapped = rows
         .filter(r => r.staff_name && r.staff_name.trim() !== "")
         .map(r => ({
