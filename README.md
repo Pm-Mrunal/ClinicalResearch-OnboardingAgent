@@ -8,9 +8,9 @@ An AI-powered onboarding and training compliance tool for clinical research staf
 
 The portal has two primary interfaces:
 
-**Staff Portal** — A guided intake form that collects role, hire date, system access needs, and prior training history. On completion, it calls an n8n webhook which invokes a Claude-powered agent to generate a personalized, role-specific training plan in real time. Staff can then ask follow-up questions and report training completions in a chat interface.
+**Staff Portal** — A guided intake form that collects role, hire date, system access needs, and prior training history. On completion, it calls an n8n webhook which invokes an agent to generate a personalized, role-specific training plan in real time. Staff can then ask follow-up questions and report training completions in a chat interface.
 
-**Manager Dashboard** — A live compliance view for PIs and regulatory staff. Pulls all staff records from n8n/Google Sheets, surfaces overdue 2-week deadlines, flags third-party contractors (SOP 21), and displays session status per team member.
+**Manager Dashboard** — A live compliance view for PIs and regulatory staff. Pulls all staff records from n8n/Google Sheets, surfaces overdue 2-week deadlines, flags third-party contractors (based on respecitve SOPs), and displays session status per team member.
 
 ---
 
@@ -117,7 +117,7 @@ Arrays are also unwrapped automatically: `[{ ... }]` → `{ ... }`.
 
 - **Role-aware training plans** — CRC, Research Nurse, Data Coordinator, RA, PI, and Other each receive a tailored plan
 - **2-week deadline tracking** — calculated from hire date, surfaced with urgency indicators in the dashboard
-- **Third-party contractor flagging** — routes to SOP 21 compliance path automatically
+- **Third-party contractor flagging** — routes to external contractor SOP compliance path automatically
 - **Prior CITI recognition** — intake captures previous institutional training to avoid redundant coursework
 - **Session persistence** — session ID stored in `sessionStorage` so chat context is maintained within a browser session
 - **Live compliance dashboard** — PI view with overdue alerts and per-member status badges
@@ -131,7 +131,7 @@ Arrays are also unwrapped automatically: `[{ ... }]` → `{ ... }`.
 - General training certificates must be retained in a central location with a Note to File in the regulatory binder
 - Protocol-specific training must be filed in the respective protocol's regulatory binder
 - **GCP certification must never be allowed to expire**
-- External/vendor contractors are flagged for **SOP 21** handling
+- External/vendor contractors are flagged for **External Contractor SOP** handling
 
 ---
 
